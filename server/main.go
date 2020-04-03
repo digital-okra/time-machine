@@ -20,7 +20,7 @@ import (
 var db *sql.DB
 var err error
 
-const DB_URL string = "./path_to_.db"
+const DB_URL string = "./test.db"
 const JWT_SECRET string = "password"
 
 func main() {
@@ -35,19 +35,24 @@ func main() {
 	// Initialise the router
 	r := mux.NewRouter()
 
-	r.HandleFunc("/login", loginUser).Methods("POST")
-	r.HandleFunc("/register", registerUser).Methods("POST")
+	// Unauthenticated endpoints
+	r.HandleFunc("/api/v1/login", loginUser).Methods("POST")
+	r.HandleFunc("/api/v1/register", registerUser).Methods("POST")
 
-	r.HandleFunc("/users/self", getUserById).Methods("GET")
-	r.HandleFunc("/users", getAllAccessibleUsers).Methods("GET")
+	auth := r.PathPrefix("/api/v1").Subrouter()
 
-	r.HandleFunc("/tasks", getTasks).Methods("GET")
-	r.HandleFunc("/tasks", createTask).Methods("POST")
-	r.HandleFunc("/tasks", updateTask).Methods("PUT")
-	r.HandleFunc("/tasks", deleteTask).Methods("DELETE")
+	auth.HandleFunc("/users/self", getUserById).Methods("GET")
+	auth.HandleFunc("/users", getAllAccessibleUsers).Methods("GET")
+
+	auth.HandleFunc("/tasks", getTasks).Methods("GET")
+	auth.HandleFunc("/tasks", createTask).Methods("POST")
+	auth.HandleFunc("/tasks", updateTask).Methods("PUT")
+	auth.HandleFunc("/tasks", deleteTask).Methods("DELETE")
 
 	r.Use(corsMiddleware)
-	r.Use(authMiddleware)
+	auth.Use(authMiddleware)
+
+	fmt.Printf("All setup running, and available on port 8000")
 
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
@@ -105,7 +110,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
 			// If the claims doesn't include the Id or the UserType, throw an error
 			if claims["id"] == nil || claims["type"] == nil {
-				http.Error(w, "Authentication failed", http.StatusForbidden)
+				http.Error(w, "Authentication claims failed", http.StatusForbidden)
 				return
 			}
 
@@ -153,17 +158,18 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 
 	var uid string
 	var passwordhash string
+	var utype string
 
 	// Get the user associated to the username if it exists
-	sql := `SELECT user, password_hash FROM user WHERE username = ?`
-	if err := db.QueryRow(sql, req.Username).Scan(&uid, &passwordhash); err != nil {
+	sql := `SELECT user, password_hash, type FROM user WHERE username = ?`
+	if err := db.QueryRow(sql, req.Username).Scan(&uid, &passwordhash, &utype); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Check if password hashes match then generate JWT
 	if passwordhash == req.PasswordHash {
-		token, err := createJWT(uid, JWT_SECRET)
+		token, err := createJWT(uid, utype, JWT_SECRET)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -173,6 +179,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Password incorrect, throw unauthorized error
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)
+		return
 	}
 }
 
@@ -190,7 +197,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	uid := shortuuid.New()
 
 	// Create the SQL prepared statement
-	sql := `INSERT INTO user VALUES ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
+	sql := `INSERT INTO user VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -207,7 +214,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return the new JWT
-	token, err := createJWT(uid, JWT_SECRET)
+	token, err := createJWT(uid, req.Type, JWT_SECRET)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -224,7 +231,7 @@ func getUserById(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 
 	// Get the user associated to the id if it exists
-	sql := `SELECT user, username, utype, amb, depot, platoon, section, man, name FROM user WHERE user = ?`
+	sql := `SELECT user, username, type, amb, depot, platoon, section, man, name FROM user WHERE user = ?`
 	if err := db.QueryRow(sql, uid).Scan(&user.Id, &user.Username, &user.Utype, &user.Amb, &user.Depot, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -259,7 +266,7 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 	var users []models.User
 
 	// Get all the users under the admin user
-	sql := `SELECT user, username, platoon, section, man, name FROM user WHERE `
+	sql := `SELECT user, username, type, amb, depot, platoon, section, man, name FROM user WHERE type = "normal" AND `
 	addAdminFilters(&sql, amb, depot, platoon, section)
 
 	result, err := db.Query(sql)
@@ -272,7 +279,7 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 
 	for result.Next() {
 		var user models.User
-		if err := result.Scan(&user.Id, &user.Username, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+		if err := result.Scan(&user.Id, &user.Username, &user.Utype, &user.Amb, &user.Depot, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -298,7 +305,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 	if utype == "normal" {
 		// Get all the tasks under this user
-		sql := `SELECT name, completed, verified FROM task WHERE assigned_to = ?`
+		sql := `SELECT task, name, assigned_to, completed, verified FROM task WHERE assigned_to = ?`
 
 		results, err := db.Query(sql, uid)
 		if err != nil {
@@ -310,7 +317,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 		for results.Next() {
 			var task models.Task
-			if err := results.Scan(&task.Name, &task.Completed, &task.Verified); err != nil {
+			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -325,9 +332,9 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get all the tasks under this admin
-		sql := `SELECT task.name, task.completed, task.verified 
+		sql := `SELECT task.task, task.name, task.assigned_to, task.completed, task.verified 
 		FROM task INNER JOIN user ON user.user = task.assigned_to 
-		WHERE `
+		WHERE type = "normal" AND `
 		addAdminFilters(&sql, amb, depot, platoon, section)
 
 		results, err := db.Query(sql, platoon, section)
@@ -340,7 +347,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 		for results.Next() {
 			var task models.Task
-			if err := results.Scan(&task.Name, &task.Completed, &task.Verified); err != nil {
+			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -371,6 +378,7 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 
 	if utype != "admin" {
 		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+		return
 	}
 
 	// Get the platoon and section of the admin user
@@ -400,20 +408,25 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		tuid := shortuuid.New()
 
 		// Create the SQL prepared statement
-		sql := `INSERT INTO task VALUES ?, ?, ?, ?, ?`
+		sql := `INSERT INTO task VALUES (?, ?, ?, false, false)`
 		stmt, err := db.Prepare(sql)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		// Execute the statement
-		_, err = stmt.Exec(tuid, req.Name, req.AssignedTo, false, false)
+		_, err = stmt.Exec(tuid, req.Name, req.AssignedTo)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	} else {
 		http.Error(w, "Insufficient admin permissions for this user", http.StatusForbidden)
+		return
 	}
+
+	w.Write([]byte("Created task successfully"))
 }
 
 type deleteTaskRequest struct {
@@ -427,6 +440,7 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 
 	if utype != "admin" {
 		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+		return
 	}
 
 	// Get the platoon and section of the admin user
@@ -471,16 +485,22 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 		stmt, err := db.Prepare(sql)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		// Execute the statement
 		_, err = stmt.Exec(task.Id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	} else {
 		http.Error(w, "Insufficient admin permissions for this user", http.StatusForbidden)
+		return
 	}
+
+	w.Write([]byte("Deleted task successfully"))
+
 }
 
 type updateTaskRequest struct {
@@ -531,11 +551,13 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		aamb, adepot, aplatoon, asection, err := getUserPrivileges(uid)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		// Retrive assignee information
 		uamb, udepot, uplatoon, usection, err := getUserPrivileges(task.AssignedTo)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		// Check if admin has enough privileges to update tasks from this user
@@ -555,6 +577,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		http.Error(w, "Unknown exception", http.StatusInternalServerError)
+		return
 	}
 
 	// Update the database with the task
@@ -562,19 +585,24 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// Execute the statement
 	_, err = stmt.Exec(task.Name, task.AssignedTo, task.Completed, task.Verified, task.Id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	w.Write([]byte("Task updated successfully"))
 }
 
 //------------------------ UTILITIES -----------------------------------------------//
-func createJWT(uid string, secret string) (string, error) {
+func createJWT(uid string, utype string, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id": uid,
+		"id":   uid,
+		"type": utype,
 	})
 	tokenString, err := token.SignedString([]byte(secret))
 
@@ -607,6 +635,6 @@ func addAdminFilters(sql *string, amb int, depot int, platoon int, section int) 
 	}
 	if section != -1 {
 		*sql += " AND "
-		*sql += fmt.Sprintf("depot = %d", depot)
+		*sql += fmt.Sprintf("section = %d", section)
 	}
 }
