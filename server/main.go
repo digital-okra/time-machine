@@ -2,13 +2,16 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
+	"github.com/lithammer/shortuuid"
+	_ "github.com/mattn/go-sqlite3"
 
 	"server/models"
 )
@@ -102,12 +105,82 @@ func authMiddleware(next http.Handler) http.Handler {
 
 //------------------------------ HANDLERS (Login) ----------------------------------//
 // These handlers specifically bypass the authentication middleware, because they do not need any verification
-func loginUser(w http.ResponseWriter, r *http.Request) {
+type loginUserRequest struct {
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+}
+type registerUserRequest struct {
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	Type         string `json:"type"`
+	Platoon      int    `json:"platoon"`
+	Section      int    `json:"section"`
+	Man          int    `json:"section"`
+	Name         string `json:"name"`
+}
 
+func loginUser(w http.ResponseWriter, r *http.Request) {
+	var req loginUserRequest
+
+	// Decode the request
+	err := json.NewDecoder(r.Body).Decode(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var uid string
+	var passwordhash string
+
+	// Get the user associated to the username if it exists
+	sql := `SELECT user, password_hash FROM user WHERE username = $1`
+	if err := db.QueryRow(sql, req.Username).Scan(&uid, &passwordhash); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if password hashes match then generate JWT
+	if passwordhash == req.PasswordHash {
+		token, err := createJWT(uid, JWT_SECRET)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Write([]byte(token))
+	} else {
+		// Password incorrect, throw unauthorized error
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+	}
 }
 
 func registerUser(w http.ResponseWriter, r *http.Request) {
+	var req registerUserRequest
 
+	// Decode the request
+	err := json.NewDecoder(r.Body).Decode(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Generate unique uid
+	uid := shortuuid.New()
+
+	// Create the SQL prepared statement
+	sql := `INSERT INTO user VALUES ?, ?, ?, ?, ?, ?, ?, ?`
+	stmt, err := db.Prepare(sql)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	//The existence of the actual content of the parsed request does not need to be checked as it is verified by the NOT NULL constraints
+
+	// Execute the statement
+	_, err = stmt.Exec(uid, req.Username, req.PasswordHash, req.Type, req.Platoon, req.Section, req.Man, req.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 //----------------------------- HANDLERS (User) ------------------------------------//
@@ -134,4 +207,14 @@ func completeTask(w http.ResponseWriter, r *http.Request) {
 
 func verifyTask(w http.ResponseWriter, r *http.Request) {
 
+}
+
+//------------------------ UTILITIES -----------------------------------------------//
+func createJWT(uid string, secret string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id": uid,
+	})
+	tokenString, err := token.SignedString([]byte(secret))
+
+	return tokenString, err
 }
