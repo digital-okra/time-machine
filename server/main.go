@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -118,9 +119,11 @@ type registerUserRequest struct {
 	Username     string `json:"username"`
 	PasswordHash string `json:"password_hash"`
 	Type         string `json:"type"`
+	Amb          int    `json:"amb"`
+	Depot        int    `json:"depot"`
 	Platoon      int    `json:"platoon"`
 	Section      int    `json:"section"`
-	Man          int    `json:"section"`
+	Man          int    `json:"man"`
 	Name         string `json:"name"`
 }
 
@@ -128,7 +131,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	var req loginUserRequest
 
 	// Decode the request
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -155,7 +158,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(token))
 	} else {
 		// Password incorrect, throw unauthorized error
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		http.Error(w, "Incorrect password", http.StatusUnauthorized)
 	}
 }
 
@@ -163,7 +166,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	var req registerUserRequest
 
 	// Decode the request
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -173,18 +176,20 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	uid := shortuuid.New()
 
 	// Create the SQL prepared statement
-	sql := `INSERT INTO user VALUES ?, ?, ?, ?, ?, ?, ?, ?`
+	sql := `INSERT INTO user VALUES ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	//The existence of the actual content of the parsed request does not need to be checked as it is verified by the NOT NULL constraints
 
 	// Execute the statement
-	_, err = stmt.Exec(uid, req.Username, req.PasswordHash, req.Type, req.Platoon, req.Section, req.Man, req.Name)
+	_, err = stmt.Exec(uid, req.Username, req.PasswordHash, req.Type, req.Amb, req.Depot, req.Platoon, req.Section, req.Man, req.Name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// Return the new JWT
@@ -205,8 +210,8 @@ func getUserById(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 
 	// Get the user associated to the id if it exists
-	sql := `SELECT user, username, utype, platoon, section, man, name FROM user WHERE user = ?`
-	if err := db.QueryRow(sql, uid).Scan(&user.Id, &user.Username, &user.Utype, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+	sql := `SELECT user, username, utype, amb, depot, platoon, section, man, name FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, uid).Scan(&user.Id, &user.Username, &user.Utype, &user.Amb, &user.Depot, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -215,6 +220,7 @@ func getUserById(w http.ResponseWriter, r *http.Request) {
 	res, err := json.Marshal(user)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Write(res)
@@ -226,26 +232,26 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 
 	if utype != "admin" {
 		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+		return
 	}
 
-	// Retrive the platoon/section that the admin is in charge of
-	var platoon int
-	var section int
-
-	// Get the platoon,section associated to the admin user if it exists
-	sql := `SELECT user, username, utype, platoon, section, man, name FROM user WHERE user = ?`
-	if err := db.QueryRow(sql, uid).Scan(&platoon, &section); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	// Get the platoon and section of the admin user
+	amb, depot, platoon, section, err := getUserPrivileges(uid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	var users []models.User
 
-	// Get all the users until the admin user
-	sql := `SELECT user, username, platoon, section, man, name FROM user WHERE platoon = ? AND section = ?`
-	result, err := db.Query(sql, platoon, section)
+	// Get all the users under the admin user
+	sql := `SELECT user, username, platoon, section, man, name FROM user WHERE `
+	addAdminFilters(&sql, amb, depot, platoon, section)
+
+	result, err := db.Query(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	defer result.Close()
@@ -263,6 +269,7 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 	res, err := json.Marshal(users)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Write(res)
@@ -270,19 +277,284 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 
 //---------------------------- HANDLERS (Task) ------------------------------------//
 func getTasks(w http.ResponseWriter, r *http.Request) {
+	uid := r.Header.Get("X-User-Claim")
+	utype := r.Header.Get("X-User-Type")
 
+	var tasks []models.Task
+
+	if utype == "normal" {
+		// Get all the tasks under this user
+		sql := `SELECT name, completed, verified FROM task WHERE assigned_to = ?`
+
+		results, err := db.Query(sql, uid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		defer results.Close()
+
+		for results.Next() {
+			var task models.Task
+			if err := results.Scan(&task.Name, &task.Completed, &task.Verified); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			tasks = append(tasks, task)
+		}
+	} else if utype == "admin" {
+		// Get the platoon and section of the admin user
+		amb, depot, platoon, section, err := getUserPrivileges(uid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Get all the tasks under this admin
+		sql := `SELECT task.name, task.completed, task.verified 
+		FROM task INNER JOIN user ON user.user = task.assigned_to 
+		WHERE `
+		addAdminFilters(&sql, amb, depot, platoon, section)
+
+		results, err := db.Query(sql, platoon, section)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		defer results.Close()
+
+		for results.Next() {
+			var task models.Task
+			if err := results.Scan(&task.Name, &task.Completed, &task.Verified); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			tasks = append(tasks, task)
+		}
+	}
+
+	// Return the full task list
+	// Marshal to JSON and return
+	res, err := json.Marshal(tasks)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(res)
+}
+
+type createTaskRequest struct {
+	Name       string `json:"name"`
+	AssignedTo string `json:"assigned_to"`
 }
 
 func createTask(w http.ResponseWriter, r *http.Request) {
+	// Check the admin privileges
+	uid := r.Header.Get("X-User-Claim")
+	utype := r.Header.Get("X-User-Type")
 
+	if utype != "admin" {
+		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+	}
+
+	// Get the platoon and section of the admin user
+	aamb, adepot, aplatoon, asection, err := getUserPrivileges(uid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var req createTaskRequest
+
+	// Decode the request
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	uamb, udepot, uplatoon, usection, err := getUserPrivileges(req.AssignedTo)
+
+	// Check if admin has enough privileges to assign tasks to this user
+	if aamb == uamb &&
+		(adepot == udepot || adepot == -1) &&
+		(aplatoon == uplatoon || aplatoon == -1) &&
+		(asection == usection || asection == -1) {
+		// Create the task
+		tuid := shortuuid.New()
+
+		// Create the SQL prepared statement
+		sql := `INSERT INTO task VALUES ?, ?, ?, ?, ?`
+		stmt, err := db.Prepare(sql)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Execute the statement
+		_, err = stmt.Exec(tuid, req.Name, req.AssignedTo, false, false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		http.Error(w, "Insufficient admin permissions for this user", http.StatusForbidden)
+	}
 }
 
-func completeTask(w http.ResponseWriter, r *http.Request) {
-
+type deleteTaskRequest struct {
+	Id string `json:"id"`
 }
 
-func verifyTask(w http.ResponseWriter, r *http.Request) {
+func deleteTask(w http.ResponseWriter, r *http.Request) {
+	// Check the admin privileges
+	uid := r.Header.Get("X-User-Claim")
+	utype := r.Header.Get("X-User-Type")
 
+	if utype != "admin" {
+		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+	}
+
+	// Get the platoon and section of the admin user
+	aamb, adepot, aplatoon, asection, err := getUserPrivileges(uid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var req deleteTaskRequest
+	var task models.Task
+
+	// Decode the request
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Retrive the task information
+	sql := `SELECT * FROM task WHERE task = ?`
+	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Retrive assignee information
+	uamb, udepot, uplatoon, usection, err := getUserPrivileges(task.AssignedTo)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check if admin has enough privileges to remove tasks from this user
+	if aamb == uamb &&
+		(adepot == udepot || adepot == -1) &&
+		(aplatoon == uplatoon || aplatoon == -1) &&
+		(asection == usection || asection == -1) {
+
+		// Create the SQL prepared statement
+		sql := `DELETE FROM task WHERE task = ?`
+		stmt, err := db.Prepare(sql)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Execute the statement
+		_, err = stmt.Exec(task.Id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		http.Error(w, "Insufficient admin permissions for this user", http.StatusForbidden)
+	}
+}
+
+type updateTaskRequest struct {
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+	AssignedTo string `json:"assigned_to"`
+	Completed  bool   `json:"completed"`
+	Verified   bool   `json:"verified"`
+}
+
+func updateTask(w http.ResponseWriter, r *http.Request) {
+	var req updateTaskRequest
+	var task models.Task
+
+	// Decode the request
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Retrive the task information
+	sql := `SELECT * FROM task WHERE task = ?`
+	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check privilege of accessing request
+	uid := r.Header.Get("X-User-Claim")
+	utype := r.Header.Get("X-User-Type")
+
+	if utype == "normal" {
+		if uid != task.AssignedTo {
+			http.Error(w, "This user doesn't have admin permissions", http.StatusForbidden)
+			return
+		}
+
+		// Normal user doesn't have access to update these fields
+		if req.Name != "" || req.AssignedTo != "" {
+			http.Error(w, "This user doesn't have permissions to update these fields", http.StatusForbidden)
+			return
+		}
+
+		task.Completed = req.Completed
+	} else if utype == "admin" {
+		// Check if admin user has access to this task assignee
+		aamb, adepot, aplatoon, asection, err := getUserPrivileges(uid)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		// Retrive assignee information
+		uamb, udepot, uplatoon, usection, err := getUserPrivileges(task.AssignedTo)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		// Check if admin has enough privileges to update tasks from this user
+		if aamb == uamb &&
+			(adepot == udepot || adepot == -1) &&
+			(aplatoon == uplatoon || aplatoon == -1) &&
+			(asection == usection || asection == -1) {
+
+			task.Name = req.Name
+			task.AssignedTo = req.AssignedTo
+			task.Completed = req.Completed
+			task.Verified = req.Verified
+
+		} else {
+			http.Error(w, "This user doesn't have admin permissions", http.StatusForbidden)
+			return
+		}
+	} else {
+		http.Error(w, "Unknown exception", http.StatusInternalServerError)
+	}
+
+	// Update the database with the task
+	sql = `UPDATE task SET name = ?, assigned_to = ?, completed = ?, verified = ? WHERE task = ?`
+	stmt, err := db.Prepare(sql)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// Execute the statement
+	_, err = stmt.Exec(task.Name, task.AssignedTo, task.Completed, task.Verified, task.Id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 //------------------------ UTILITIES -----------------------------------------------//
@@ -293,4 +565,34 @@ func createJWT(uid string, secret string) (string, error) {
 	tokenString, err := token.SignedString([]byte(secret))
 
 	return tokenString, err
+}
+
+func getUserPrivileges(uid string) (int, int, int, int, error) {
+	var amb int
+	var depot int
+	var platoon int
+	var section int
+
+	sql := `SELECT amb, depot, platoon, section FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, uid).Scan(&amb, &depot, &platoon, &section); err != nil {
+		return amb, depot, platoon, section, err
+	}
+
+	return amb, depot, platoon, section, nil
+}
+
+func addAdminFilters(sql *string, amb int, depot int, platoon int, section int) {
+	*sql += fmt.Sprintf("amb = %d", amb)
+	if depot != -1 {
+		*sql += " AND "
+		*sql += fmt.Sprintf("depot = %d", depot)
+	}
+	if platoon != -1 {
+		*sql += " AND "
+		*sql += fmt.Sprintf("platoon = %d", platoon)
+	}
+	if section != -1 {
+		*sql += " AND "
+		*sql += fmt.Sprintf("depot = %d", depot)
+	}
 }

@@ -5,9 +5,11 @@ CREATE TABLE 'user' (
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   type CHAR(1) CHECK( type IN ('normal', 'admin') ) NOT NULL,
-  platoon INT DEFAULT NULL,
-  section INT DEFAULT NULL,
-  man INT DEFAULT NULL,
+  amb INT NOT NULL DEFAULT -1,
+  depot INT NOT NULL DEFAULT -1
+  platoon INT NOT NULL DEFAULT -1,
+  section INT NOT NULL DEFAULT -1,
+  man INT NOT NULL DEFAULT -1,
   name TEXT NOT NULL
 )
 
