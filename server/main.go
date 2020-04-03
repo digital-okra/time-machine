@@ -99,3 +99,39 @@ func authMiddleware(next http.Handler) http.Handler {
 		}
 	})
 }
+
+//------------------------------ HANDLERS (Login) ----------------------------------//
+// These handlers specifically bypass the authentication middleware, because they do not need any verification
+func loginUser(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func registerUser(w http.ResponseWriter, r *http.Request) {
+
+}
+
+//----------------------------- HANDLERS (User) ------------------------------------//
+func getUserById(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
+
+}
+
+//---------------------------- HANDLERS (Task) ------------------------------------//
+func getTasks(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func createTask(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func completeTask(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func verifyTask(w http.ResponseWriter, r *http.Request) {
+
+}
