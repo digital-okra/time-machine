@@ -35,6 +35,20 @@ func main() {
 	// Initialise the router
 	r := mux.NewRouter()
 
+	r.HandleFunc("/login", loginUser).Methods("POST")
+	r.HandleFunc("/register", registerUser).Methods("POST")
+
+	r.HandleFunc("/users/self", getUserById).Methods("GET")
+	r.HandleFunc("/users", getAllAccessibleUsers).Methods("GET")
+
+	r.HandleFunc("/tasks", getTasks).Methods("GET")
+	r.HandleFunc("/tasks", createTask).Methods("POST")
+	r.HandleFunc("/tasks", updateTask).Methods("PUT")
+	r.HandleFunc("/tasks", deleteTask).Methods("DELETE")
+
+	r.Use(corsMiddleware)
+	r.Use(authMiddleware)
+
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
 
