@@ -5,6 +5,9 @@ CREATE TABLE 'user' (
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   type CHAR(1) CHECK( type IN ('S', 'A') ) NOT NULL,
+  platoon INT DEFAULT NULL,
+  section INT DEFAULT NULL,
+  man INT DEFAULT NULL,
   name TEXT NOT NULL
 )
 
