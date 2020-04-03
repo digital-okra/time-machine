@@ -4,6 +4,9 @@ type User struct {
 	Id       string `json:"id"`
 	Username string `json:"username"`
 	Utype    string `json:"utype"`
+	Platoon  int    `json:"platoon"`
+	Section  int    `json:"section"`
+	Man      int    `json:"man"`
 	Name     string `json:"name"`
 }
 

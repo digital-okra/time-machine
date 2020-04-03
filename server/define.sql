@@ -4,7 +4,7 @@ CREATE TABLE 'user' (
   'user' CHAR(22) PRIMARY KEY NOT NULL,
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
-  type CHAR(1) CHECK( type IN ('User', 'Admin') ) NOT NULL,
+  type CHAR(1) CHECK( type IN ('normal', 'admin') ) NOT NULL,
   platoon INT DEFAULT NULL,
   section INT DEFAULT NULL,
   man INT DEFAULT NULL,

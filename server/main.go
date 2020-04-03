@@ -94,7 +94,12 @@ func authMiddleware(next http.Handler) http.Handler {
 				return
 			}
 
-			r.Header.Set("X-User-Claim", claims["id"].(string))
+			uid := claims["id"].(string)
+			utype := claims["type"].(string)
+
+			r.Header.Set("X-User-Claim", uid)
+			r.Header.Set("X-User-Type", utype)
+
 			next.ServeHTTP(w, r)
 		} else {
 			http.Error(w, "Auth token invalid", http.StatusForbidden)
@@ -133,7 +138,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	var passwordhash string
 
 	// Get the user associated to the username if it exists
-	sql := `SELECT user, password_hash FROM user WHERE username = $1`
+	sql := `SELECT user, password_hash FROM user WHERE username = ?`
 	if err := db.QueryRow(sql, req.Username).Scan(&uid, &passwordhash); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -181,15 +186,86 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+
+	// Return the new JWT
+	token, err := createJWT(uid, JWT_SECRET)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte(token))
 }
 
 //----------------------------- HANDLERS (User) ------------------------------------//
 func getUserById(w http.ResponseWriter, r *http.Request) {
+	// Get the current user id
+	uid := r.Header.Get("X-User-Claim")
 
+	var user models.User
+
+	// Get the user associated to the id if it exists
+	sql := `SELECT user, username, utype, platoon, section, man, name FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, uid).Scan(&user.Id, &user.Username, &user.Utype, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Marshal to JSON and return
+	res, err := json.Marshal(user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write(res)
 }
 
 func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
+	uid := r.Header.Get("X-User-Claim")
+	utype := r.Header.Get("X-User-Type")
 
+	if utype != "admin" {
+		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+	}
+
+	// Retrive the platoon/section that the admin is in charge of
+	var platoon int
+	var section int
+
+	// Get the platoon,section associated to the admin user if it exists
+	sql := `SELECT user, username, utype, platoon, section, man, name FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, uid).Scan(&platoon, &section); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var users []models.User
+
+	// Get all the users until the admin user
+	sql := `SELECT user, username, platoon, section, man, name FROM user WHERE platoon = ? AND section = ?`
+	result, err := db.Query(sql, platoon, section)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	defer result.Close()
+
+	for result.Next() {
+		var user models.User
+		if err := result.Scan(&user.Id, &user.Username, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		users = append(users, user)
+	}
+
+	// Marshal to JSON and return
+	res, err := json.Marshal(users)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Write(res)
 }
 
 //---------------------------- HANDLERS (Task) ------------------------------------//
