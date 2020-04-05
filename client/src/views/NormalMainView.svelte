@@ -15,20 +15,63 @@
     </TabBar>
 </TopAppBar>
 
-<List checklist style="padding-top: 7rem;">
-  {#each tasks as task}
-    <Item>
-      <Label>{task.name}</Label>
-        <Meta>
-          <Checkbox bind:group={selectedCheckbox} value="{task.verified}" />
-        </Meta>
-    </Item>
-  {/each}
-</List>
+{#if showActive}
+<div class="active-tab">
+  <List checklist twoLine>
+    {#each tasks as task}
+      <Item>
+        <Text>
+          <PrimaryText>{task.name}</PrimaryText>
+          <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
+        </Text>
+          <Meta>
+            <Checkbox bind:group={selectedCheckbox} value="{task.verified}" />
+          </Meta>
+      </Item>
+    {/each}
+  </List>
+</div>
+{/if}
+
+{#if showCompleted}
+<div class="completed-tab">
+  <div>
+    <div class="divider mdc-typography--overline">
+      Pending verification
+    </div>
+    <List twoLine checklist>
+      {#each tasks as task}
+        <Item>
+          <Text>
+            <PrimaryText>{task.name}</PrimaryText>
+              <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
+          </Text>
+          <Meta>
+            <Checkbox bind:group={selectedCheckbox} value="{task.verified}" />
+          </Meta>
+        </Item>
+      {/each}
+    </List>
+  <div class="divider mdc-typography--overline">
+    Verified
+  </div>
+    <List twoLine>
+      {#each tasks as task}
+        <Item>
+          <Text>
+            <PrimaryText>{task.name}</PrimaryText>
+              <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
+          </Text>
+        </Item>
+      {/each}
+    </List>
+  </div>
+</div>
+{/if}
 
 <script>
   import TopAppBar, {Row, Section, Title} from '@smui/top-app-bar';
-  import List, {Meta, Label, Item} from '@smui/list';
+  import List, {Group, Subheader, Meta, Label, Item, Text, PrimaryText, SecondaryText} from '@smui/list';
   import IconButton from '@smui/icon-button';
   import Checkbox from '@smui/checkbox';
 
@@ -37,6 +80,10 @@
 
   let selectedCheckbox = "";
   let active = "Active"
+  $: showActive = (active == "Active")
+  $: showCompleted = (active == "Completed")
+
+
   let tasks = [
     {
       name: "Fix tank 1",
@@ -130,5 +177,29 @@
   :global(.mdc-tab-indicator .mdc-tab-indicator__content--underline) {
     border-color: white;
     border-top-width: 5px;
+  }
+
+  .active-tab {
+    padding-top: 6rem;
+  }
+
+  .completed-tab {
+    padding-top: 6.5rem;
+  }
+
+  .divider {
+    background-color: #00897b;
+    color: white;
+    position: sticky;
+    top: 6.5rem;
+    height: 2rem;
+
+    padding-left: 1rem;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    z-index: 1000;
   }
 </style>
