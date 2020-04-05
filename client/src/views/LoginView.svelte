@@ -1,7 +1,7 @@
 <div class="login-view">
   <Paper color="primary" square style="flex: 1;">
     <div class="header-container">
-      <h1 class="mdc-typography--headline4">Time Machine</h1>
+      <i class="material-icons" style="font-size: 7rem;">av_timer</i>
     </div>
   </Paper>
   <ul class="login-form">
@@ -16,10 +16,7 @@
       </Textfield>
     </li>
     <li class="spacing align-bottom">
-      <Button on:click={() => alert('Clicked!')} variant="raised" style="width: 100%;">Login</Button>
-    </li>
-    <li class="spacing">
-      <Button on:click={() => alert('Clicked!')} variant="raised" style="width: 100%;">Register</Button>
+      <Button on:click={() => {}} variant="raised" style="width: 100%;">Login</Button>
     </li>
   </ul>
 </div>
@@ -43,6 +40,7 @@
 
   .header-container {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
 
@@ -53,7 +51,7 @@
   }
 
   .login-form {
-    flex: 1;
+    flex: 2;
     padding: 0.1rem 2rem;
     list-style-type: none;
     display: flex;
