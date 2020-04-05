@@ -1,12 +1,12 @@
 {
-  "name": "smui-example-rollup",
+  "name": "smui-example-webpack",
   "version": "1.0.0",
-  "description": "An example project implementing Svelte Material UI with Rollup.",
+  "description": "An example project implementing Svelte Material UI with Webpack.",
   "main": "index.js",
   "scripts": {
-    "build": "rollup -c rollup.config.js",
+    "build": "webpack",
     "serve": "serve .",
-    "watch": "rollup -c rollup.config.js --watch",
+    "watch": "webpack --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Hunter Perrin <hperrin@gmail.com>",
@@ -14,12 +14,18 @@
   "devDependencies": {
     "@material/typography": "^3.1.0",
     "@smui/button": "^1.0.0-beta.20",
-    "rollup": "^1.30.1",
-    "rollup-plugin-commonjs": "^10.1.0",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-postcss": "^2.0.5",
-    "rollup-plugin-svelte": "^5.1.1",
+    "@smui/paper": "^1.0.0-beta.20",
+    "@smui/textfield": "^1.0.0-beta.20",
+    "css-loader": "^3.4.2",
+    "mini-css-extract-plugin": "^0.8.2",
+    "node-sass": "^4.13.1",
+    "optimize-css-assets-webpack-plugin": "^5.0.3",
+    "sass-loader": "^8.0.2",
     "serve": "^11.3.0",
-    "svelte": "^3.18.1"
+    "style-loader": "^1.1.3",
+    "svelte": "^3.18.1",
+    "svelte-loader": "^2.13.6",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10"
   }
 }
