@@ -7,12 +7,12 @@
       <IconButton class="material-icons" aria-label="Logout">exit_to_app</IconButton>
     </Section>
   </Row>
-    <TabBar tabs={['Active', 'Completed']} let:tab bind:active class="nav-tab-bar">
-      <!-- Notice that the `tab` property is required! -->
-      <Tab {tab} class="nav-tab">
-        <Label>{tab}</Label>
-      </Tab>
-    </TabBar>
+  <TabBar tabs={['Active', 'Completed']} let:tab bind:active class="nav-tab-bar">
+    <!-- Notice that the `tab` property is required! -->
+    <Tab {tab} class="nav-tab">
+      <Label>{tab}</Label>
+    </Tab>
+  </TabBar>
 </TopAppBar>
 
 {#if showActive}
@@ -36,7 +36,7 @@
 {#if showCompleted}
 <div class="completed-tab">
   <div>
-    <div class="divider mdc-typography--overline">
+    <div class="divider waiting mdc-typography--overline">
       Pending verification
     </div>
     <List twoLine checklist>
@@ -52,7 +52,7 @@
         </Item>
       {/each}
     </List>
-  <div class="divider mdc-typography--overline">
+  <div class="divider verified mdc-typography--overline">
     Verified
   </div>
     <List twoLine>
@@ -79,9 +79,9 @@
   import TabBar from '@smui/tab-bar';
 
   let selectedCheckbox = "";
-  let active = "Active"
-  $: showActive = (active == "Active")
-  $: showCompleted = (active == "Completed")
+  let active = "Active";
+  $: showActive = (active == "Active");
+  $: showCompleted = (active == "Completed");
 
 
   let tasks = [
@@ -188,7 +188,6 @@
   }
 
   .divider {
-    background-color: #00897b;
     color: white;
     position: sticky;
     top: 6.5rem;
@@ -201,5 +200,13 @@
     justify-content: center;
 
     z-index: 1000;
+  }
+
+  .waiting {
+    background-color: #ffb300;
+  }
+  
+  .verified {
+    background-color: #00897b;
   }
 </style>
