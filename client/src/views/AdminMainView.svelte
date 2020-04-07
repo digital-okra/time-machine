@@ -163,7 +163,7 @@
   import Tab from '@smui/tab';
   import TabBar from '@smui/tab-bar';
   
-  import { jwt_store, userid_store } from '../store.js';
+  import { userid_store } from '../store.js';
   import { getAllUsers } from '../services/UserService.js';
   import { getTasks, toggleVerifyTask, createTask } from '../services/TaskService.js';
   
@@ -173,7 +173,7 @@
   let active = "Completed";
   let currentActiveUser = "";
   let currentActiveUserId = "";
-  let jwt = $jwt_store;
+  let jwt;
   let userid = $userid_store;
 
   let dialog;
@@ -193,6 +193,13 @@
   $: showCompleted = (active == "Completed");
 
   onMount(async () => {
+    let storage = window.localStorage;
+    jwt = storage.getItem("jwt");
+
+    if(jwt == null) {
+      navigate("/", { replace: true });
+    }
+
     users = await getAllUsers(jwt)
     tasks = await getTasks(jwt)
 
@@ -244,9 +251,6 @@
   }
   
   async function onLogout() {
-    // Clear the store
-    jwt_store.update(old_jwt => "");
-
     // Clear localStorage
     let storage = window.localStorage;
     storage.clear();

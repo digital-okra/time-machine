@@ -104,14 +104,13 @@
   import Tab from '@smui/tab';
   import TabBar from '@smui/tab-bar';
   
-  import { jwt_store } from '../store.js';
   import { getTasks, toggleCompletedTask } from '../services/TaskService.js';
 
   import { onMount } from 'svelte';
 
   let selectedCheckbox = "";
   let active = "Active";
-  let jwt = $jwt_store;
+  let jwt;
   let tasks = [];
 
   $: showActive = (active == "Active");
@@ -122,6 +121,12 @@
   $: verifiedTasks = tasks.filter(task => task.verified);
 
   onMount(async () => {
+    let storage = window.localStorage;
+    jwt = storage.getItem("jwt");
+
+    if(jwt == null) {
+      navigate("/", { replace: true });
+    }
     // Retrive the tasks
     tasks = await getTasks(jwt);
 	});
@@ -132,9 +137,6 @@
   }
 
   async function onLogout() {
-    // Clear the store
-    jwt_store.update(old_jwt => "");
-
     // Clear localStorage
     let storage = window.localStorage;
     storage.clear();
