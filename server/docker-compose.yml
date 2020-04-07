@@ -1,0 +1,19 @@
+version: "3.1"
+services:
+  timemachine-server:
+    build: .
+    command: sh -c './server'
+    environment:
+      - DATABASE_URL=${TM_DATABASE_URL}
+      - JWT_SECRET=${TM_JWT_SECRET}
+    volumes:
+      - ./timemachine.db:/app/timemachine.db
+    labels:
+     - traefik.enable=true
+     - traefik.frontend.rule=Host:backend.timemachine.mescreators.com
+     - traefik.port=8000
+    networks:
+      - web
+networks:
+  web:
+    external: true

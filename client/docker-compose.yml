@@ -1,0 +1,16 @@
+version: "3.1"
+services:
+  timemachine-frontend:
+    build: .
+    restart: unless-stopped
+    labels:
+     - traefik.enable=true
+     - traefik.frontend.rule=Host:timemachine.mescreators.com
+     - traefik.port=3000
+    networks:
+     - web
+
+networks:
+  web:
+    external: true
+

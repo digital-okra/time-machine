@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"os"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
@@ -21,10 +22,13 @@ import (
 var db *sql.DB
 var err error
 
-const DB_URL string = "./test.db"
-const JWT_SECRET string = "password"
+var DB_URL string
+var JWT_SECRET string
 
 func main() {
+	DB_URL = os.Getenv("DATABASE_URL")
+	JWT_SECRET = os.Getenv("JWT_SECRET")
+
 	// Initialise the global DB pool
 	db, err = sql.Open("sqlite3", DB_URL)
 	if err != nil {
