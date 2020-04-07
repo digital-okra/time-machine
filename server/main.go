@@ -135,6 +135,12 @@ type loginUserRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+type loginUserResponse struct {
+	Jwt  string `json:"jwt"`
+	Type string `json:"type"`
+}
+
 type registerUserRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -149,6 +155,7 @@ type registerUserRequest struct {
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
 	var req loginUserRequest
+	var response loginUserResponse
 
 	// Decode the request
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -176,7 +183,16 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Write([]byte(token))
+		response.Jwt = token
+		response.Type = utype
+
+		res, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(res)
 	} else {
 		// Password incorrect, throw unauthorized error
 		http.Error(w, "Incorrect password", http.StatusUnauthorized)

@@ -67,20 +67,27 @@
   async function onLogin() {
     try {
       loading = true;
-      let jwt = await loginUser(username, password);
+      let token = await loginUser(username, password);
       // store the JWT in the store and in local storage
-      jwt_store.update(old_jwt => jwt);
+      jwt_store.update(old_jwt => token.jwt);
 
       let storage = window.localStorage;
-      storage.setItem("jwt", jwt);
+      storage.setItem("jwt", token.jwt);
+      storage.setItem("type", token.type);
 
       // Navigate to user page
-      navigate("/tasks", { replace: true });
+      if(token.type === "normal") {
+        navigate("/tasks", { replace: true });
+      } else if(token.type === "admin") {
+        navigate("/admin", { replace: true });
+      } else {
+        throw "Something went wrong";
+      }
     } catch(err) {
       if(err === 400 || err === 401) {
         errorMessage = "Invalid username or password";
       } else {
-        errorMessage = "Server error. Try again!";
+        errorMessage = `Unknown error ${err}. Try again!`;
       }
       errorSnackbar.open();
       loading = false;
@@ -90,13 +97,18 @@
   onMount(() => {
     let storage = window.localStorage;
     let jwt = storage.getItem("jwt");
+    let type = storage.getItem("type");
 
     // If there is already an existed logged in user, log them in directly
-    if(jwt != null) {
+    if(jwt != null && type != null) {
       jwt_store.update(old_jwt => jwt);
       
       // Navigate to user page
-      navigate("/tasks", { replace: true });
+      if(type === "normal") {
+        navigate("/tasks", { replace: true });
+      } else if(type === "admin") {
+        navigate("/admin", { replace: true });
+      }
     }
   });
 </script>

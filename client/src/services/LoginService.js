@@ -23,8 +23,8 @@ export async function loginUser(username, password) {
     throw rawResponse.status;
   }
 
-  // Return the text which is a JWT
-  return await rawResponse.text();
+  // Return the json which is a JWT and the permission
+  return await rawResponse.json();
 }
 
 export async function registerUser(username, password, type, amb, depot, platoon, section, man, name) {

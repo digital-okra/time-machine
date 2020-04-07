@@ -5,12 +5,12 @@
       <Title>Technician List</Title>
       {/if}
       {#if showTaskView}
-      <IconButton class="material-icons">keyboard_backspace</IconButton>
+        <IconButton class="material-icons" on:click={onReturn}>keyboard_backspace</IconButton>
         <Title>{currentActiveUser}'s Tasks</Title>
       {/if}
     </Section>
     <Section align="end" toolbar>
-      <IconButton class="material-icons" aria-label="Logout">exit_to_app</IconButton>
+      <IconButton class="material-icons" aria-label="Logout" on:click={onLogout}>exit_to_app</IconButton>
     </Section>
   </Row>
   
@@ -31,7 +31,7 @@
         <Item>
           <Text>
             <PrimaryText>{user.name}</PrimaryText>
-            <SecondaryText><span class="mdc-typography--body2">{user.assigned_task_count} tasks left</span></SecondaryText>
+            <SecondaryText><span class="mdc-typography--body2">0 tasks left</span></SecondaryText>
           </Text>
         </Item>
       {/each}
@@ -100,52 +100,48 @@
 
   import Tab from '@smui/tab';
   import TabBar from '@smui/tab-bar';
+  
+  import { jwt_store } from '../store.js';
+  import { getAllUsers } from '../services/UserService.js';
+  import { getTasks, toggleVerifiedTask } from '../services/TaskService.js';
+  
+  import { onMount } from 'svelte';
 
   let showTaskView = true;
   let active = "Completed";
   let currentActiveUser = "Sudharshan";
+  let jwt = $jwt_store;
+
+  let tasks = [];
+  let users = [];
 
   let selectedCheckbox = "";
   
   $: showVerified = (active == "Verified");
   $: showActive = (active == "Active");
   $: showCompleted = (active == "Completed");
-  
-  let tasks = [
-    {
-      name: "Fix tank 1",
-      assigned_by: "person 1",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 5",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    }
-  ];
 
-  let users = [
-    {
-      name: "LCP Sundaramahalingam Sudharshan",
-      assigned_task_count: 5
-    },
-    {
-      name: "LCP Sanil Kuman Ashwin",
-      assigned_task_count: 3
-    },
-    {
-      name: "PTE Derwin Yan",
-      assigned_task_count: 10
-    }
-  ];
+  onMount(async () => {
+    users = await getAllUsers(jwt)
+    console.log(users)
+
+    tasks = await getTasks(jwt)
+  });
+  
+  function onReturn() {
+    showTaskView = false;
+  }
+  
+  async function onLogout() {
+    // Clear the store
+    jwt_store.update(old_jwt => "");
+
+    // Clear localStorage
+    let storage = window.localStorage;
+    storage.clear();
+
+    navigate("/", { replace: true});
+  }
 </script>
 
 <style>
