@@ -17,7 +17,7 @@
 
 {#if showActive}
 <div class="active-tab">
-  {#if completedTasks.length == 0}
+  {#if activeTasks.length == 0}
     <List>
       <Item>
         <Text><span style="color: #9e9e9e;">No completed tasks</span></Text>
