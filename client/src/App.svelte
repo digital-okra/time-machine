@@ -1,5 +1,5 @@
 <Router url="{url}">
-  <Route path="/admin" component="{AdminMainView}"></Route>
+  <Route path="/admin"><AdminMainView /></Route>
   <Route path="/tasks"><NormalMainView /></Route>
   <Route path="/"><LoginView /></Route>
 </Router>

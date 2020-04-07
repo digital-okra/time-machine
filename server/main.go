@@ -139,18 +139,21 @@ type loginUserRequest struct {
 type loginUserResponse struct {
 	Jwt  string `json:"jwt"`
 	Type string `json:"type"`
+	Id   string `json:"id"`
 }
 
 type registerUserRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Type     string `json:"type"`
-	Amb      int    `json:"amb"`
-	Depot    int    `json:"depot"`
-	Platoon  int    `json:"platoon"`
-	Section  int    `json:"section"`
-	Man      int    `json:"man"`
-	Name     string `json:"name"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Type      string `json:"type"`
+	Amb       int    `json:"amb"`
+	Depot     int    `json:"depot"`
+	Platoon   int    `json:"platoon"`
+	Section   int    `json:"section"`
+	Man       int    `json:"man"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Rank      string `json:"rank"`
 }
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
@@ -185,6 +188,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 
 		response.Jwt = token
 		response.Type = utype
+		response.Id = uid
 
 		res, err := json.Marshal(response)
 		if err != nil {
@@ -214,7 +218,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	uid := shortuuid.New()
 
 	// Create the SQL prepared statement
-	sql := `INSERT INTO user VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sql := `INSERT INTO user VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -231,7 +235,7 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute the statement
-	_, err = stmt.Exec(uid, req.Username, passwordhash, req.Type, req.Amb, req.Depot, req.Platoon, req.Section, req.Man, req.Name)
+	_, err = stmt.Exec(uid, req.Username, passwordhash, req.Type, req.Amb, req.Depot, req.Platoon, req.Section, req.Man, req.Rank, req.FirstName, req.LastName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -248,27 +252,36 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 }
 
 //----------------------------- HANDLERS (User) ------------------------------------//
+type getUserResponse struct {
+	Id        string `json:"id"`
+	Username  string `json:"username"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Rank      string `json:"rank"`
+	Utype     string `json:"type"`
+}
+
 func getUserById(w http.ResponseWriter, r *http.Request) {
 	// Get the current user id
 	uid := r.Header.Get("X-User-Claim")
 
-	var user models.User
+	var res getUserResponse
 
 	// Get the user associated to the id if it exists
-	sql := `SELECT user, username, type, amb, depot, platoon, section, man, name FROM user WHERE user = ?`
-	if err := db.QueryRow(sql, uid).Scan(&user.Id, &user.Username, &user.Utype, &user.Amb, &user.Depot, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+	sql := `SELECT user, username, type, first_name, last_name, rank FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, uid).Scan(&res.Id, &res.Username, &res.Utype, &res.FirstName, &res.LastName, &res.Rank); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Marshal to JSON and return
-	res, err := json.Marshal(user)
+	dres, err := json.Marshal(res)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Write(res)
+	w.Write(dres)
 }
 
 func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
@@ -287,10 +300,10 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var users []models.User
+	var users []getUserResponse
 
 	// Get all the users under the admin user
-	sql := `SELECT user, username, type, amb, depot, platoon, section, man, name FROM user WHERE type = "normal" AND `
+	sql := `SELECT user, username, type, first_name, last_name, rank FROM user WHERE type = "normal" AND `
 	addAdminFilters(&sql, amb, depot, platoon, section)
 
 	result, err := db.Query(sql)
@@ -302,8 +315,8 @@ func getAllAccessibleUsers(w http.ResponseWriter, r *http.Request) {
 	defer result.Close()
 
 	for result.Next() {
-		var user models.User
-		if err := result.Scan(&user.Id, &user.Username, &user.Utype, &user.Amb, &user.Depot, &user.Platoon, &user.Section, &user.Man, &user.Name); err != nil {
+		var user getUserResponse
+		if err := result.Scan(&user.Id, &user.Username, &user.Utype, &user.FirstName, &user.LastName, &user.Rank); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -329,7 +342,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 	if utype == "normal" {
 		// Get all the tasks under this user
-		sql := `SELECT task, name, assigned_to, completed, verified FROM task WHERE assigned_to = ?`
+		sql := `SELECT task, name, assigned_to, assigned_by, completed, verified, verified_by FROM task WHERE assigned_to = ?`
 
 		results, err := db.Query(sql, uid)
 		if err != nil {
@@ -341,10 +354,31 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 		for results.Next() {
 			var task models.Task
-			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.AssignedBy, &task.Completed, &task.Verified, &task.VerifiedBy); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
+			var assignRank, assignFirstName, assignLastName string
+
+			// Getting the assigned_by
+			sql = `SELECT rank, first_name, last_name FROM user WHERE user = ?`
+			if err := db.QueryRow(sql, task.AssignedBy).Scan(&assignRank, &assignFirstName, &assignLastName); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			var verifiedRank, verifiedFirstName, verifiedLastName string
+
+			// Getting the assigned_by
+			sql = `SELECT rank, first_name, last_name FROM user WHERE user = ?`
+			if err := db.QueryRow(sql, task.VerifiedBy).Scan(&verifiedRank, &verifiedFirstName, &verifiedLastName); err != nil {
+				// Do nothing
+			}
+
+			task.AssignedBy = fmt.Sprintf("%s %s %s", assignRank, assignFirstName, assignLastName)
+			task.VerifiedBy = fmt.Sprintf("%s %s %s", verifiedRank, verifiedFirstName, verifiedLastName)
+
 			tasks = append(tasks, task)
 		}
 	} else if utype == "admin" {
@@ -356,7 +390,7 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get all the tasks under this admin
-		sql := `SELECT task.task, task.name, task.assigned_to, task.completed, task.verified 
+		sql := `SELECT task.task, task.name, task.assigned_to, task.assigned_by, task.completed, task.verified, task.verified_by
 		FROM task INNER JOIN user ON user.user = task.assigned_to 
 		WHERE type = "normal" AND `
 		addAdminFilters(&sql, amb, depot, platoon, section)
@@ -371,10 +405,31 @@ func getTasks(w http.ResponseWriter, r *http.Request) {
 
 		for results.Next() {
 			var task models.Task
-			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+			if err := results.Scan(&task.Id, &task.Name, &task.AssignedTo, &task.AssignedBy, &task.Completed, &task.Verified, &task.VerifiedBy); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
+			var assignRank, assignFirstName, assignLastName string
+
+			// Getting the assigned_by
+			sql = `SELECT rank, first_name, last_name FROM user WHERE user = ?`
+			if err := db.QueryRow(sql, task.AssignedBy).Scan(&assignRank, &assignFirstName, &assignLastName); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			var verifiedRank, verifiedFirstName, verifiedLastName string
+
+			// Getting the assigned_by
+			sql = `SELECT rank, first_name, last_name FROM user WHERE user = ?`
+			if err := db.QueryRow(sql, task.VerifiedBy).Scan(&verifiedRank, &verifiedFirstName, &verifiedLastName); err != nil {
+				// Do nothing
+			}
+
+			task.AssignedBy = fmt.Sprintf("%s %s %s", assignRank, assignFirstName, assignLastName)
+			task.VerifiedBy = fmt.Sprintf("%s %s %s", verifiedRank, verifiedFirstName, verifiedLastName)
+
 			tasks = append(tasks, task)
 		}
 	}
@@ -432,7 +487,7 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		tuid := shortuuid.New()
 
 		// Create the SQL prepared statement
-		sql := `INSERT INTO task VALUES (?, ?, ?, false, false)`
+		sql := `INSERT INTO task VALUES (?, ?, ?, ?, ?, ?, "")`
 		stmt, err := db.Prepare(sql)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -440,7 +495,7 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Execute the statement
-		_, err = stmt.Exec(tuid, req.Name, req.AssignedTo)
+		_, err = stmt.Exec(tuid, req.Name, req.AssignedTo, uid, false, false)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -486,7 +541,7 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// Retrive the task information
 	sql := `SELECT * FROM task WHERE task = ?`
-	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.AssignedBy, &task.Completed, &task.Verified, &task.VerifiedBy); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -527,16 +582,8 @@ func deleteTask(w http.ResponseWriter, r *http.Request) {
 
 }
 
-type updateTaskRequest struct {
-	Id         string `json:"id"`
-	Name       string `json:"name"`
-	AssignedTo string `json:"assigned_to"`
-	Completed  bool   `json:"completed"`
-	Verified   bool   `json:"verified"`
-}
-
 func updateTask(w http.ResponseWriter, r *http.Request) {
-	var req updateTaskRequest
+	var req models.Task
 	var task models.Task
 
 	// Decode the request
@@ -548,7 +595,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 
 	// Retrive the task information
 	sql := `SELECT * FROM task WHERE task = ?`
-	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.Completed, &task.Verified); err != nil {
+	if err := db.QueryRow(sql, req.Id).Scan(&task.Id, &task.Name, &task.AssignedTo, &task.AssignedBy, &task.Completed, &task.Verified, &task.VerifiedBy); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -564,7 +611,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Normal user doesn't have access to update these fields
-		if req.Name != task.Name || req.AssignedTo != task.AssignedTo || req.Verified != task.Verified {
+		if req.Id != task.Id || req.Name != task.Name || req.AssignedTo != task.AssignedTo || req.Verified != task.Verified || req.AssignedBy != task.AssignedBy || req.VerifiedBy != task.VerifiedBy {
 			http.Error(w, "This user doesn't have permissions to update these fields", http.StatusForbidden)
 			return
 		}
@@ -592,8 +639,10 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 
 			task.Name = req.Name
 			task.AssignedTo = req.AssignedTo
+			// task.AssignedBy = req.AssignedBy
 			task.Completed = req.Completed
 			task.Verified = req.Verified
+			// task.VerifiedBy = req.VerifiedBy
 
 		} else {
 			http.Error(w, "This user doesn't have admin permissions", http.StatusForbidden)
@@ -605,7 +654,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the database with the task
-	sql = `UPDATE task SET name = ?, assigned_to = ?, completed = ?, verified = ? WHERE task = ?`
+	sql = `UPDATE task SET name = ?, assigned_to = ?, assigned_by = ?, completed = ?, verified = ?, verified_by = ? WHERE task = ?`
 	stmt, err := db.Prepare(sql)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -613,7 +662,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute the statement
-	_, err = stmt.Exec(task.Name, task.AssignedTo, task.Completed, task.Verified, task.Id)
+	_, err = stmt.Exec(task.Name, task.AssignedTo, task.AssignedBy, task.Completed, task.Verified, task.VerifiedBy, task.Id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

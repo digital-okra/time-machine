@@ -17,19 +17,27 @@
 
 {#if showActive}
 <div class="active-tab">
-  <List twoLine checklist>
-    {#each activeTasks as task}
+  {#if completedTasks.length == 0}
+    <List>
       <Item>
-        <Text>
-          <PrimaryText>{task.name}</PrimaryText>
-          <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
-        </Text>
-          <Meta>
-            <Checkbox on:click="{toggleCompleted(task)}" bind:checked={task.completed} />
-          </Meta>
+        <Text><span style="color: #9e9e9e;">No completed tasks</span></Text>
       </Item>
-    {/each}
-  </List>
+    </List>
+  {:else}
+    <List twoLine checklist>
+      {#each activeTasks as task}
+        <Item on:click="{toggleCompleted(task)}">
+          <Text>
+            <PrimaryText>{task.name}</PrimaryText>
+            <SecondaryText><span class="mdc-typography--overline">{task.assigned_by}</span></SecondaryText>
+          </Text>
+            <Meta>
+              <Checkbox on:click="{toggleCompleted(task)}" bind:checked={task.completed} />
+            </Meta>
+        </Item>
+      {/each}
+    </List>
+  {/if}
 </div>
 {/if}
 
@@ -48,10 +56,10 @@
     {:else}
       <List twoLine checklist>
         {#each completedTasks as task}
-          <Item>
+          <Item on:click="{toggleCompleted(task)}">
             <Text>
               <PrimaryText>{task.name}</PrimaryText>
-                <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
+                <SecondaryText><span class="mdc-typography--overline">{task.assigned_by}</span></SecondaryText>
             </Text>
             <Meta>
               <Checkbox on:click="{toggleCompleted(task)}" bind:checked={task.completed}/>
@@ -70,12 +78,13 @@
         </Item>
       </List>
     {:else}
-      <List twoLine>
+      <List threeLine>
         {#each verifiedTasks as task}
           <Item>
             <Text>
               <PrimaryText>{task.name}</PrimaryText>
-                <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
+                <SecondaryText><span class="mdc-typography--overline">{task.assigned_by}</span></SecondaryText>
+                <SecondaryText><span class="mdc-typography--body2">Verified by {task.verified_by}</span></SecondaryText>
             </Text>
           </Item>
         {/each}

@@ -11,7 +11,7 @@
       </Textfield>
     </li>
     <li class="spacing">
-      <Textfield withLeadingIcon variant="filled" bind:value={password} label="Password" style="width: 100%">
+      <Textfield withLeadingIcon variant="filled" bind:value={password} label="Password" style="width: 100%" type="password">
         <Icon class="material-icons">fiber_pin</Icon>
       </Textfield>
     </li>
@@ -55,7 +55,7 @@
   import { onMount } from 'svelte';
 
   import { loginUser } from '../services/LoginService.js';
-  import { jwt_store } from '../store.js';
+  import { jwt_store, userid_store } from '../store.js';
 
   let username = "";
   let password = "";  
@@ -70,10 +70,12 @@
       let token = await loginUser(username, password);
       // store the JWT in the store and in local storage
       jwt_store.update(old_jwt => token.jwt);
+      userid_store.update(old_userid => token.id);
 
       let storage = window.localStorage;
       storage.setItem("jwt", token.jwt);
       storage.setItem("type", token.type);
+      storage.setItem("id", token.id);
 
       // Navigate to user page
       if(token.type === "normal") {
@@ -98,10 +100,12 @@
     let storage = window.localStorage;
     let jwt = storage.getItem("jwt");
     let type = storage.getItem("type");
+    let id = storage.getItem("id");
 
     // If there is already an existed logged in user, log them in directly
-    if(jwt != null && type != null) {
+    if(jwt != null && type != null && id != null) {
       jwt_store.update(old_jwt => jwt);
+      userid_store.update(old_userid => id);
       
       // Navigate to user page
       if(type === "normal") {

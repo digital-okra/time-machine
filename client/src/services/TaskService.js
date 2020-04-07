@@ -63,14 +63,16 @@ export async function deleteTask(jwt, id) {
   return await rawResponse.text()
 }
 
-export async function toggleVerifyTask(jwt, task) {
+export async function toggleVerifyTask(jwt, task, userid) {
   // Create json
   let req = JSON.stringify({
     id: task.id,
     name: task.name,
     assigned_to: task.assigned_to,
+    assigned_by: task.assigned_by,
     completed: task.completed,
-    verified: !task.verified
+    verified: !task.verified,
+    verified_by: userid
   }); 
 
   const rawResponse = await fetch(`${baseUrl}/tasks`, {
@@ -95,8 +97,10 @@ export async function toggleCompletedTask(jwt, task) {
     id: task.id,
     name: task.name,
     assigned_to: task.assigned_to,
+    assigned_by: task.assigned_by,
     completed: !task.completed,
-    verified: task.verified
+    verified: task.verified,
+    verfied_by: task.verified_by
   }); 
 
   const rawResponse = await fetch(`${baseUrl}/tasks`, {
