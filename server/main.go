@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"os"
+	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
@@ -615,7 +615,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Normal user doesn't have access to update these fields
-		if req.Id != task.Id || req.Name != task.Name || req.AssignedTo != task.AssignedTo || req.Verified != task.Verified || req.AssignedBy != task.AssignedBy || req.VerifiedBy != task.VerifiedBy {
+		if req.Id != task.Id || req.Name != task.Name || req.AssignedTo != task.AssignedTo || req.Verified != task.Verified {
 			http.Error(w, "This user doesn't have permissions to update these fields", http.StatusForbidden)
 			return
 		}
@@ -646,7 +646,12 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 			// task.AssignedBy = req.AssignedBy
 			task.Completed = req.Completed
 			task.Verified = req.Verified
-			// task.VerifiedBy = req.VerifiedBy
+
+			if req.Verified == true && task.Verified == false {
+				task.VerifiedBy = uid
+			} else if req.Verified == false && task.Verified == true {
+				task.VerifiedBy = ""
+			}
 
 		} else {
 			http.Error(w, "This user doesn't have admin permissions", http.StatusForbidden)
