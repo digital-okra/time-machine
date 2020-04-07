@@ -163,7 +163,6 @@
   import Tab from '@smui/tab';
   import TabBar from '@smui/tab-bar';
   
-  import { userid_store } from '../store.js';
   import { getAllUsers } from '../services/UserService.js';
   import { getTasks, toggleVerifyTask, createTask } from '../services/TaskService.js';
   
@@ -174,7 +173,7 @@
   let currentActiveUser = "";
   let currentActiveUserId = "";
   let jwt;
-  let userid = $userid_store;
+  let userid;
 
   let dialog;
   let taskname = "";
@@ -195,8 +194,9 @@
   onMount(async () => {
     let storage = window.localStorage;
     jwt = storage.getItem("jwt");
+    userid = storage.getItem("id");
 
-    if(jwt == null) {
+    if(jwt == null || userid == null) {
       navigate("/", { replace: true });
     }
 

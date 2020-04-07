@@ -1,7 +1,7 @@
 version: "3.1"
 services:
   timemachine-server:
-    build: .
+    image: solderneer/timemachine-backend
     command: sh -c './server'
     environment:
       - DATABASE_URL=${TM_DATABASE_URL}

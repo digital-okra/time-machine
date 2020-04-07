@@ -55,7 +55,6 @@
   import { onMount } from 'svelte';
 
   import { loginUser } from '../services/LoginService.js';
-  import { userid_store } from '../store.js';
 
   let username = "";
   let password = "";  
@@ -68,8 +67,6 @@
     try {
       loading = true;
       let token = await loginUser(username, password);
-      // store the JWT in the store and in local storage
-      userid_store.update(old_userid => token.id);
 
       let storage = window.localStorage;
       storage.setItem("jwt", token.jwt);
@@ -102,9 +99,7 @@
     let id = storage.getItem("id");
 
     // If there is already an existed logged in user, log them in directly
-    if(jwt != null && type != null && id != null) {
-      userid_store.update(old_userid => id);
-      
+    if(jwt != null && type != null && id != null) { 
       // Navigate to user page
       if(type === "normal") {
         navigate("/tasks", { replace: true });
@@ -119,8 +114,6 @@
   .login-view {
     display: flex;
     flex-direction: column;
-
-    height: 100vh;
   }
 
   .header-container {
@@ -152,7 +145,9 @@
   }
 
   .align-bottom {
-    margin-top: auto;
+    position: absolute;
+    bottom: 10px;
+    width: 80%;
   }
 </style>
 

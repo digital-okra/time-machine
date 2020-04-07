@@ -13,7 +13,7 @@ server.get("*", function(req, res) {
   <!DOCTYPE html>
   <html>
   <head>
-    <title>SMUI Example</title>
+    <title>Time Machine</title>
     <meta charset="utf-8">
 
     <!-- Fonts and CSS -->
