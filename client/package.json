@@ -18,6 +18,7 @@
     "@smui/icon-button": "^1.0.0-beta.20",
     "@smui/list": "^1.0.0-beta.20",
     "@smui/paper": "^1.0.0-beta.20",
+    "@smui/snackbar": "^1.0.0-beta.20",
     "@smui/tab": "^1.0.0-beta.20",
     "@smui/tab-bar": "^1.0.0-beta.20",
     "@smui/textfield": "^1.0.0-beta.20",
@@ -33,5 +34,9 @@
     "svelte-loader": "^2.13.6",
     "webpack": "^4.41.5",
     "webpack-cli": "^3.3.10"
+  },
+  "dependencies": {
+    "svelte-routing": "^1.4.2",
+    "svelte-spinner": "^2.0.2"
   }
 }

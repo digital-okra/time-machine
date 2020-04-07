@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lithammer/shortuuid"
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 
 	"server/models"
 )
@@ -36,18 +37,18 @@ func main() {
 	r := mux.NewRouter()
 
 	// Unauthenticated endpoints
-	r.HandleFunc("/api/v1/login", loginUser).Methods("POST")
+	r.HandleFunc("/api/v1/login", loginUser).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/register", registerUser).Methods("POST")
 
 	auth := r.PathPrefix("/api/v1").Subrouter()
 
-	auth.HandleFunc("/users/self", getUserById).Methods("GET")
-	auth.HandleFunc("/users", getAllAccessibleUsers).Methods("GET")
+	auth.HandleFunc("/users/self", getUserById).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/users", getAllAccessibleUsers).Methods("GET", "OPTIONS")
 
-	auth.HandleFunc("/tasks", getTasks).Methods("GET")
-	auth.HandleFunc("/tasks", createTask).Methods("POST")
-	auth.HandleFunc("/tasks", updateTask).Methods("PUT")
-	auth.HandleFunc("/tasks", deleteTask).Methods("DELETE")
+	auth.HandleFunc("/tasks", getTasks).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/tasks", createTask).Methods("POST", "OPTIONS")
+	auth.HandleFunc("/tasks", updateTask).Methods("PUT", "OPTIONS")
+	auth.HandleFunc("/tasks", deleteTask).Methods("DELETE", "OPTIONS")
 
 	r.Use(corsMiddleware)
 	auth.Use(authMiddleware)
@@ -61,7 +62,7 @@ func main() {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST")
+		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
 
 		if r.Method == "OPTIONS" {
@@ -131,19 +132,19 @@ func authMiddleware(next http.Handler) http.Handler {
 //------------------------------ HANDLERS (Login) ----------------------------------//
 // These handlers specifically bypass the authentication middleware, because they do not need any verification
 type loginUserRequest struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 type registerUserRequest struct {
-	Username     string `json:"username"`
-	PasswordHash string `json:"password_hash"`
-	Type         string `json:"type"`
-	Amb          int    `json:"amb"`
-	Depot        int    `json:"depot"`
-	Platoon      int    `json:"platoon"`
-	Section      int    `json:"section"`
-	Man          int    `json:"man"`
-	Name         string `json:"name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Type     string `json:"type"`
+	Amb      int    `json:"amb"`
+	Depot    int    `json:"depot"`
+	Platoon  int    `json:"platoon"`
+	Section  int    `json:"section"`
+	Man      int    `json:"man"`
+	Name     string `json:"name"`
 }
 
 func loginUser(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +169,7 @@ func loginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if password hashes match then generate JWT
-	if passwordhash == req.PasswordHash {
+	if CheckPasswordHash(req.Password, passwordhash) {
 		token, err := createJWT(uid, utype, JWT_SECRET)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -206,8 +207,15 @@ func registerUser(w http.ResponseWriter, r *http.Request) {
 
 	//The existence of the actual content of the parsed request does not need to be checked as it is verified by the NOT NULL constraints
 
+	// Generate the password hash
+	passwordhash, err := HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Execute the statement
-	_, err = stmt.Exec(uid, req.Username, req.PasswordHash, req.Type, req.Amb, req.Depot, req.Platoon, req.Section, req.Man, req.Name)
+	_, err = stmt.Exec(uid, req.Username, passwordhash, req.Type, req.Amb, req.Depot, req.Platoon, req.Section, req.Man, req.Name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -540,7 +548,7 @@ func updateTask(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Normal user doesn't have access to update these fields
-		if req.Name != "" || req.AssignedTo != "" {
+		if req.Name != task.Name || req.AssignedTo != task.AssignedTo || req.Verified != task.Verified {
 			http.Error(w, "This user doesn't have permissions to update these fields", http.StatusForbidden)
 			return
 		}
@@ -637,4 +645,14 @@ func addAdminFilters(sql *string, amb int, depot int, platoon int, section int) 
 		*sql += " AND "
 		*sql += fmt.Sprintf("section = %d", section)
 	}
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

@@ -6,28 +6,99 @@
   </Paper>
   <ul class="login-form">
     <li class="spacing">
-      <Textfield withLeadingIcon variant="filled" bind:value={valueFilledB} label="Username" style="width: 100%">
+      <Textfield withLeadingIcon variant="filled" bind:value={username} label="Username" style="width: 100%">
         <Icon class="material-icons">person</Icon>
       </Textfield>
     </li>
     <li class="spacing">
-      <Textfield withLeadingIcon variant="filled" bind:value={valueFilledB} label="Password" style="width: 100%">
+      <Textfield withLeadingIcon variant="filled" bind:value={password} label="Password" style="width: 100%">
         <Icon class="material-icons">fiber_pin</Icon>
       </Textfield>
     </li>
     <li class="spacing align-bottom">
-      <Button on:click={() => {}} variant="raised" style="width: 100%;">Login</Button>
+      <Button on:click={onLogin} variant="raised" style="width: 100%;">
+        {#if !loading}
+          Login
+        {/if}
+        {#if loading}
+          <Spinner
+            size="30"
+            speed="750"
+            color="#FFFFFF"
+            thickness="2"
+            gap="40"
+          />
+        {/if}
+      </Button>
     </li>
+    <Snackbar bind:this={errorSnackbar}>
+      <Label>{errorMessage}</Label>
+      <Actions>
+        <IconButton class="material-icons" title="Dismiss">close</IconButton>
+      </Actions>
+    </Snackbar>
   </ul>
 </div>
 
 <script>
   import Paper from '@smui/paper';
+  import { navigate } from "svelte-routing";
   import Textfield from '@smui/textfield';
   import Icon from '@smui/textfield/icon/index';
   import Button from '@smui/button';
-  
-  let valueFilledB = "";
+
+  import Snackbar, {Actions, Label} from '@smui/snackbar';
+  import IconButton from '@smui/icon-button';
+
+  import Spinner from 'svelte-spinner';
+
+  import { onMount } from 'svelte';
+
+  import { loginUser } from '../services/LoginService.js';
+  import { jwt_store } from '../store.js';
+
+  let username = "";
+  let password = "";  
+  let loading = false;
+
+  let errorSnackbar;
+  let errorMessage = "";
+
+  async function onLogin() {
+    try {
+      loading = true;
+      let jwt = await loginUser(username, password);
+      // store the JWT in the store and in local storage
+      jwt_store.update(old_jwt => jwt);
+
+      let storage = window.localStorage;
+      storage.setItem("jwt", jwt);
+
+      // Navigate to user page
+      navigate("/tasks", { replace: true });
+    } catch(err) {
+      if(err === 400 || err === 401) {
+        errorMessage = "Invalid username or password";
+      } else {
+        errorMessage = "Server error. Try again!";
+      }
+      errorSnackbar.open();
+      loading = false;
+    }
+  }
+
+  onMount(() => {
+    let storage = window.localStorage;
+    let jwt = storage.getItem("jwt");
+
+    // If there is already an existed logged in user, log them in directly
+    if(jwt != null) {
+      jwt_store.update(old_jwt => jwt);
+      
+      // Navigate to user page
+      navigate("/tasks", { replace: true });
+    }
+  });
 </script>
 
 <style>

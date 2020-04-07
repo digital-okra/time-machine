@@ -25,6 +25,15 @@ module.exports = {
       canPrint: true
     })
   ],
+  resolve: {
+    // This alias is important to prevent svelte mismatch
+    // between your code, and the 3rd party components.
+    alias: {
+      svelte: path.resolve('node_modules', 'svelte')
+    },
+    extensions: ['.mjs', '.js', '.svelte'],
+    mainFields: ['svelte', 'browser', 'module', 'main']
+  },
   module: {
     rules: [
       {

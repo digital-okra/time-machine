@@ -149,6 +149,24 @@
   dependencies:
     "@material/feature-targeting" "^3.1.0"
 
+"@material/snackbar@^3.2.0":
+  version "3.2.0"
+  resolved "https://registry.yarnpkg.com/@material/snackbar/-/snackbar-3.2.0.tgz#ca59459d18db2e5f79078554c09a813bca55bd16"
+  integrity sha512-WVA+dJYbzDMlPpXCdkGEQqi1+tHqV8a9tKBYlr4Vy+3UUaEl6gIomRiWNnagoodhOwGQhyugCeLKHtmVn72IZA==
+  dependencies:
+    "@material/animation" "^3.1.0"
+    "@material/base" "^3.1.0"
+    "@material/button" "^3.2.0"
+    "@material/dom" "^3.1.0"
+    "@material/feature-targeting" "^3.1.0"
+    "@material/icon-button" "^3.2.0"
+    "@material/ripple" "^3.2.0"
+    "@material/rtl" "^3.2.0"
+    "@material/shape" "^3.1.0"
+    "@material/theme" "^3.1.0"
+    "@material/typography" "^3.1.0"
+    tslib "^1.9.3"
+
 "@material/tab-bar@^3.2.0":
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/@material/tab-bar/-/tab-bar-3.2.0.tgz#b4909bffff6b1be591269a4ddf88efd8227725b9"
@@ -333,6 +351,17 @@
   integrity sha512-X5fcJ41iTsjYhN7gkU6GJc5MC3pSLwqIoZ/iIPc5T44R1nXfeRkrtg/QMzjI1dXgHPw5W6TOBaOhpiPhNTc2MQ==
   dependencies:
     "@material/ripple" "^3.2.0"
+
+"@smui/snackbar@^1.0.0-beta.20":
+  version "1.0.0-beta.20"
+  resolved "https://registry.yarnpkg.com/@smui/snackbar/-/snackbar-1.0.0-beta.20.tgz#d7b30975f461651db4778d58803b662cdb321d66"
+  integrity sha512-Te92fzSJPS8Q11iN5VXw/kiqMbUhvYmE9VDJ49m+WBU94w1d0IaDXyVP3Oo8I65/Z0O4su0bp89GwU4J/5WYrQ==
+  dependencies:
+    "@material/feature-targeting" "^3.1.0"
+    "@material/snackbar" "^3.2.0"
+    "@smui/button" "^1.0.0-beta.20"
+    "@smui/common" "^1.0.0-beta.20"
+    "@smui/icon-button" "^1.0.0-beta.20"
 
 "@smui/tab-bar@^1.0.0-beta.20":
   version "1.0.0-beta.20"
@@ -4950,6 +4979,16 @@ svelte-loader@^2.13.6:
   dependencies:
     loader-utils "^1.1.0"
     svelte-dev-helper "^1.1.9"
+
+svelte-routing@^1.4.2:
+  version "1.4.2"
+  resolved "https://registry.yarnpkg.com/svelte-routing/-/svelte-routing-1.4.2.tgz#291160b537c9c73e711731eb099c48bb24cc3419"
+  integrity sha512-CSCKRLeOp9vjsDGGOEgL9DPm9HZLgZuTNehyTCl3K+6fCVH1Aw/K/WicavAVNcbsHmdR4wgF//0YVR9hrcdvGA==
+
+svelte-spinner@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/svelte-spinner/-/svelte-spinner-2.0.2.tgz#ec090651dd7ef2ccdaa5ba972ee456a2e306ae2c"
+  integrity sha512-tIsvy/udEdVxwf5HYg9zFvXVxGmS1O+zq2K1ush6ojNZy0DY+ZoW8lRYQEbvXMkU6ur2NfTECGV5ZSA4Rw6XRg==
 
 svelte@^3.0, svelte@^3.18.1:
   version "3.20.1"

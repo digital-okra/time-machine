@@ -8,4 +8,5 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/lithammer/shortuuid v3.0.0+incompatible
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
 )

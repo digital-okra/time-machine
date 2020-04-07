@@ -1,9 +1,16 @@
-<NormalMainView />
+<Router url="{url}">
+  <Route path="/admin" component="{AdminMainView}"></Route>
+  <Route path="/tasks"><NormalMainView /></Route>
+  <Route path="/"><LoginView /></Route>
+</Router>
 
 <script>
+  import { Router, Route } from "svelte-routing";
   import LoginView from './views/LoginView.svelte';
   import NormalMainView from './views/NormalMainView.svelte';
   import AdminMainView from './views/AdminMainView.svelte';
+
+  let url = "";
 </script>
 
 <style>

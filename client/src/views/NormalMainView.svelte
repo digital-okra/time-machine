@@ -4,7 +4,7 @@
       <Title>Your Tasks</Title>
     </Section>
     <Section align="end" toolbar>
-      <IconButton class="material-icons" aria-label="Logout">exit_to_app</IconButton>
+      <IconButton class="material-icons" aria-label="Logout" on:click={onLogout}>exit_to_app</IconButton>
     </Section>
   </Row>
   <TabBar tabs={['Active', 'Completed']} let:tab bind:active class="nav-tab-bar">
@@ -17,15 +17,15 @@
 
 {#if showActive}
 <div class="active-tab">
-  <List checklist twoLine>
-    {#each tasks as task}
+  <List twoLine checklist>
+    {#each activeTasks as task}
       <Item>
         <Text>
           <PrimaryText>{task.name}</PrimaryText>
-          <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
+          <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
         </Text>
           <Meta>
-            <Checkbox bind:group={selectedCheckbox} value="{task.verified}" />
+            <Checkbox on:click="{toggleCompleted(task)}" bind:checked={task.completed} />
           </Meta>
       </Item>
     {/each}
@@ -39,125 +39,99 @@
     <div class="divider waiting mdc-typography--overline">
       Pending verification
     </div>
-    <List twoLine checklist>
-      {#each tasks as task}
+    {#if completedTasks.length == 0}
+      <List>
         <Item>
-          <Text>
-            <PrimaryText>{task.name}</PrimaryText>
-              <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
-          </Text>
-          <Meta>
-            <Checkbox bind:group={selectedCheckbox} value="{task.verified}" />
-          </Meta>
+          <Text><span style="color: #9e9e9e;">No completed tasks</span></Text>
         </Item>
-      {/each}
-    </List>
+      </List>
+    {:else}
+      <List twoLine checklist>
+        {#each completedTasks as task}
+          <Item>
+            <Text>
+              <PrimaryText>{task.name}</PrimaryText>
+                <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
+            </Text>
+            <Meta>
+              <Checkbox on:click="{toggleCompleted(task)}" bind:checked={task.completed}/>
+            </Meta>
+          </Item>
+        {/each}
+      </List>
+    {/if}
   <div class="divider verified mdc-typography--overline">
     Verified
   </div>
-    <List twoLine>
-      {#each tasks as task}
+    {#if verifiedTasks.length == 0}
+      <List>
         <Item>
-          <Text>
-            <PrimaryText>{task.name}</PrimaryText>
-              <SecondaryText><span class="mdc-typography--body2">{task.assigned_by}</span></SecondaryText>
-          </Text>
+          <Text><span style="color: #9e9e9e;">No verified tasks</span></Text>
         </Item>
-      {/each}
-    </List>
+      </List>
+    {:else}
+      <List twoLine>
+        {#each verifiedTasks as task}
+          <Item>
+            <Text>
+              <PrimaryText>{task.name}</PrimaryText>
+                <SecondaryText><span class="mdc-typography--body2">{task.assigned_to}</span></SecondaryText>
+            </Text>
+          </Item>
+        {/each}
+      </List>
+    {/if}
   </div>
 </div>
 {/if}
 
 <script>
   import TopAppBar, {Row, Section, Title} from '@smui/top-app-bar';
+  import { navigate } from "svelte-routing";
   import List, {Group, Subheader, Meta, Label, Item, Text, PrimaryText, SecondaryText} from '@smui/list';
   import IconButton from '@smui/icon-button';
   import Checkbox from '@smui/checkbox';
 
   import Tab from '@smui/tab';
   import TabBar from '@smui/tab-bar';
+  
+  import { jwt_store } from '../store.js';
+  import { getTasks, toggleCompletedTask } from '../services/TaskService.js';
+
+  import { onMount } from 'svelte';
 
   let selectedCheckbox = "";
   let active = "Active";
+  let jwt = $jwt_store;
+  let tasks = [];
+
   $: showActive = (active == "Active");
   $: showCompleted = (active == "Completed");
 
+  $: activeTasks = tasks.filter(task => !task.completed);
+  $: completedTasks = tasks.filter(task => task.completed);
+  $: verifiedTasks = tasks.filter(task => task.verified);
 
-  let tasks = [
-    {
-      name: "Fix tank 1",
-      assigned_by: "person 1",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 5",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    },
-    {
-      name: "Fix tank 2",
-      assigned_by: "person 3",
-      completed: false,
-      verified: false,
-    }
-  ];
+  onMount(async () => {
+    // Retrive the tasks
+    tasks = await getTasks(jwt);
+	});
+
+  async function toggleCompleted(task) {
+    console.log(task);
+    toggleCompletedTask(jwt, task);
+  }
+
+  async function onLogout() {
+    // Clear the store
+    jwt_store.update(old_jwt => "");
+
+    // Clear localStorage
+    let storage = window.localStorage;
+    storage.clear();
+
+    navigate("/", { replace: true});
+  }
 </script>
 
 <style>
