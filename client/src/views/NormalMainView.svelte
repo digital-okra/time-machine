@@ -116,9 +116,9 @@
   $: showActive = (active == "Active");
   $: showCompleted = (active == "Completed");
 
-  $: activeTasks = tasks.filter(task => !task.completed);
-  $: completedTasks = tasks.filter(task => task.completed);
-  $: verifiedTasks = tasks.filter(task => task.verified);
+  $: activeTasks = tasks.filter(task => !task.completed && !task.verified);
+  $: completedTasks = tasks.filter(task => task.completed && !task.verified);
+  $: verifiedTasks = tasks.filter(task => task.verified && task.completed);
 
   onMount(async () => {
     let storage = window.localStorage;
