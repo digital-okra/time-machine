@@ -46,7 +46,8 @@ func main() {
 
 	auth := r.PathPrefix("/api/v1").Subrouter()
 
-	auth.HandleFunc("/users/self", getUserById).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/users/self", getUser).Methods("GET", "OPTIONS")
+	auth.HandleFunc("/users/{userid}", getUserById).Methods("GET", "OPTIONS")
 	auth.HandleFunc("/users", getAllAccessibleUsers).Methods("GET", "OPTIONS")
 
 	auth.HandleFunc("/tasks", getTasks).Methods("GET", "OPTIONS")
@@ -265,7 +266,7 @@ type getUserResponse struct {
 	Utype     string `json:"type"`
 }
 
-func getUserById(w http.ResponseWriter, r *http.Request) {
+func getUser(w http.ResponseWriter, r *http.Request) {
 	// Get the current user id
 	uid := r.Header.Get("X-User-Claim")
 
@@ -274,6 +275,40 @@ func getUserById(w http.ResponseWriter, r *http.Request) {
 	// Get the user associated to the id if it exists
 	sql := `SELECT user, username, type, first_name, last_name, rank FROM user WHERE user = ?`
 	if err := db.QueryRow(sql, uid).Scan(&res.Id, &res.Username, &res.Utype, &res.FirstName, &res.LastName, &res.Rank); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Marshal to JSON and return
+	dres, err := json.Marshal(res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(dres)
+}
+
+func getUserById(w http.ResponseWriter, r *http.Request) {
+	// Get the current user id
+	utype := r.Header.Get("X-User-Type")
+
+	if utype != "admin" {
+		http.Error(w, "No admin permissions for this user", http.StatusForbidden)
+		return
+	}
+
+	// Extract mux Vars
+	vars := mux.Vars(r)
+	if vars["userid"] == "" {
+		http.Error(w, "No user specifed", http.StatusBadRequest)
+	}
+
+	var res getUserResponse
+
+	// Get the user associated to the id if it exists
+	sql := `SELECT user, username, type, first_name, last_name, rank FROM user WHERE user = ?`
+	if err := db.QueryRow(sql, vars["userid"]).Scan(&res.Id, &res.Username, &res.Utype, &res.FirstName, &res.LastName, &res.Rank); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
