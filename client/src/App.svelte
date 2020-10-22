@@ -2,7 +2,7 @@
   <Route path="/admin"><AdminMainView /></Route>
     <Route path="/admin/user/:userid" let:params><AdminTaskView userid="{params.userid}"/></Route>
   <Route path="/tasks"><NormalMainView /></Route>
-  <Route path="/"><LoginView /></Route>
+  <Route path="/"><NormalMainView /></Route>
 </Router>
 
 <script>
